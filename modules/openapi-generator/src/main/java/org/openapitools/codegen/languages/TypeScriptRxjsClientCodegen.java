@@ -24,6 +24,7 @@ import org.openapitools.codegen.*;
 import org.openapitools.codegen.meta.features.DocumentationFeature;
 import org.openapitools.codegen.model.ModelMap;
 import org.openapitools.codegen.model.ModelsMap;
+import org.openapitools.codegen.model.OperationMap;
 import org.openapitools.codegen.model.OperationsMap;
 import org.openapitools.codegen.utils.ModelUtils;
 import org.slf4j.Logger;
@@ -83,6 +84,31 @@ public class TypeScriptRxjsClientCodegen extends AbstractTypeScriptClientCodegen
 
     public void setNpmRepository(String npmRepository) {
         this.npmRepository = npmRepository;
+    }
+
+    /**
+     * Returns the correct return type based on all 2xx HTTP responses defined for an operation.
+     *
+     * @param responses all CodegenResponses defined for one operation
+     * @return TypeScript return type
+     */
+    private String getReturnType(List<CodegenResponse> responses) {
+        Set<String> returnTypes = new HashSet<>();
+        for (CodegenResponse response : responses) {
+            if (response.is2xx || response.is4xx) {
+                if (response.dataType != null) {
+                    returnTypes.add(response.dataType);
+                } else {
+                    returnTypes.add("void");
+                }
+            }
+        }
+
+        if (returnTypes.size() == 0) {
+            return null;
+        }
+
+        return String.join(" | ", returnTypes);
     }
 
     @Override
@@ -206,6 +232,14 @@ public class TypeScriptRxjsClientCodegen extends AbstractTypeScriptClientCodegen
             newOs.add(new ExtendedCodegenOperation(o));
         }
         operations.getOperations().setOperation(newOs);
+
+        // TypeScript supports multiple return types, so we need to add them to the returnType property
+        OperationMap operationsMap = operations.getOperations();
+        List<CodegenOperation> operationList = operationsMap.getOperation();
+        for (CodegenOperation operation : operationList) {
+            List<CodegenResponse> responses = operation.responses;
+            operation.returnType = this.getReturnType(responses);
+        }
 
         this.addOperationModelImportInformation(operations);
         this.updateOperationParameterEnumInformation(operations);
